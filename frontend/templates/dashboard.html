@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard - Credenciales</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen p-6">
+  <header class="mb-6">
+    <h1 class="text-3xl font-bold text-center">Dashboard de Credenciales</h1>
+  </header>
+
+  <section id="credentials-section" class="max-w-4xl mx-auto bg-white rounded shadow p-6">
+    <h2 class="text-xl font-semibold mb-4">Tus Credenciales</h2>
+    <ul id="credentials-list" class="space-y-2">
+      <!-- Aquí se listarán las credenciales -->
+    </ul>
+
+    <form id="credential-form" class="mt-6 space-y-4 max-w-md">
+      <h3 class="text-lg font-semibold">Agregar Nueva Credencial</h3>
+      <div>
+        <label for="platform" class="block text-gray-700">Plataforma</label>
+        <input type="text" id="platform" name="platform" required class="w-full border border-gray-300 rounded px-3 py-2" />
+      </div>
+      <div>
+        <label for="username" class="block text-gray-700">Usuario</label>
+        <input type="text" id="username" name="username" class="w-full border border-gray-300 rounded px-3 py-2" />
+      </div>
+      <div>
+        <label for="email" class="block text-gray-700">Email</label>
+        <input type="email" id="email" name="email" class="w-full border border-gray-300 rounded px-3 py-2" />
+      </div>
+      <div>
+        <label for="encrypted_password" class="block text-gray-700">Contraseña Encriptada</label>
+        <input type="text" id="encrypted_password" name="encrypted_password" required class="w-full border border-gray-300 rounded px-3 py-2" />
+      </div>
+      <button type="submit" class="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700">Agregar Credencial</button>
+    </form>
+
+    <div id="message" class="mt-4 text-red-600"></div>
+  </section>
+
+  <script>
+    // Aquí puedes agregar el código JavaScript para consumir las APIs y manejar la UI
+    // Por ejemplo, cargar credenciales, enviar nuevas, manejar tokens, etc.
+  </script>
+</body>
+</html>
