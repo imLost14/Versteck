@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-function Login() {
+function Login({ setIsAuthenticated }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
@@ -22,12 +22,12 @@ function Login() {
 
       const data = await response.json();
 
-      const token = data.token;
+      const token = data.access;
 
       localStorage.setItem('authToken', token);
 
-      alert('Login exitoso, token guardado.');
-
+      // Actualizar estado de autenticación en App.js
+      setIsAuthenticated(true);
 
     } catch (error) {
       alert('Error al iniciar sesión: ' + error.message);

@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
+from vault.encryption import encrypt_password, decrypt_password
 
 # Create your models here.
 class CustomUser(AbstractUser):
@@ -17,6 +18,12 @@ class Credential(models.Model):
     def clean(self):
         if not self.username and not self.email:
             raise ValidationError("Debe proporcionarl al menos un username o email")
+
+    def set_password(self, plain_password: str):
+        self.encrypted_password = encrypt_password(plain_password)
+
+    def get_password(self) -> str:
+        return decrypt_password(self.encrypted_password)
 
     def save(self, *args, **kwargs):
         self.full_clean()

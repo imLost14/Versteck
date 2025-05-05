@@ -8,9 +8,7 @@ import pyotp
 import qrcode
 from io import BytesIO
 import base64
-from django.shortcuts import render, redirect
-from django.contrib.auth.decorators import login_required
-from django.contrib.auth import authenticate, login
+
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
@@ -67,4 +65,16 @@ class CredentialAPI(APIView):
         credentials = Credential.objects.filter(user=request.user)
         serializer = CredentialSerializer(credentials, many=True)
         return Response(serializer.data)
+
+class CredentialPasswordDecryptAPI(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        try:
+            credential = Credential.objects.get(pk=pk, user=request.user)
+        except Credential.DoesNotExist:
+            return Response({'error': 'Credential not found'}, status=404)
+
+        decrypted_password = credential.get_password()
+        return Response({'decrypted_password': decrypted_password})
 
