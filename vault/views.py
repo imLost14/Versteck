@@ -66,6 +66,27 @@ class CredentialAPI(APIView):
         serializer = CredentialSerializer(credentials, many=True)
         return Response(serializer.data)
 
+    def put(self, request, pk):
+        try:
+            credential = Credential.objects.get(pk=pk, user=request.user)
+        except Credential.DoesNotExist:
+            return Response({'error': 'Credencial no encontrada'}, status=404)
+
+        serializer = CredentialSerializer(credential, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)
+
+    def delete(self, request, pk):
+        try:
+            credential = Credential.objects.get(pk=pk, user=request.user)
+        except Credential.DoesNotExist:
+            return Response({'error': 'Credencial no encontrada'}, status=404)
+
+        credential.delete()
+        return Response(status=204)
+
 class CredentialPasswordDecryptAPI(APIView):
     permission_classes = [IsAuthenticated]
 
