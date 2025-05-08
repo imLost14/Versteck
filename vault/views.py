@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.permissions import IsAuthenticated
 from .models import CustomUser, Credential
-from .serializers import CredentialSerializer
+from .serializers import CredentialSerializer, UserSerializer
 import pyotp
 import qrcode
 from io import BytesIO
@@ -48,8 +48,17 @@ class VerifyMFA(APIView):
         totp = pyotp.TOTP(user.mfa_secret)
 
         if totp.verify(code):
+            user.mfa_enabled = True
+            user.save()
             return Response({'status': 'MFA verificado'})
         return Response({'error': 'Código inválido'}, status=400)
+
+class UserDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data)
 
 class CredentialAPI(APIView):
     permission_classes = [IsAuthenticated]
@@ -98,4 +107,5 @@ class CredentialPasswordDecryptAPI(APIView):
 
         decrypted_password = credential.get_password()
         return Response({'decrypted_password': decrypted_password})
+
 

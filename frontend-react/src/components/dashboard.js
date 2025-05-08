@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 function Dashboard({ setIsAuthenticated }) {
   const [credentials, setCredentials] = useState([]);
@@ -20,7 +20,117 @@ function Dashboard({ setIsAuthenticated }) {
     password: '',
   });
 
+  // Estados para MFA
+  const [mfaEnabled, setMfaEnabled] = useState(false);
+  const [mfaSetupQR, setMfaSetupQR] = useState(null);
+  const [mfaSecret, setMfaSecret] = useState(null);
+  const [mfaCode, setMfaCode] = useState('');
+  const [showMfaSetup, setShowMfaSetup] = useState(false);
+  const [mfaMessage, setMfaMessage] = useState(null);
+
   const token = localStorage.getItem('authToken');
+
+  useEffect(() => {
+    if (!token) {
+      setIsAuthenticated(false);
+      return;
+    }
+    fetchUserMfaStatus();
+  }, [token]);
+
+  const fetchUserMfaStatus = async () => {
+    setError(null);
+    try {
+      const response = await fetch('http://localhost:8000/api/user/', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) {
+        throw new Error('Error al obtener estado MFA');
+      }
+      const data = await response.json();
+      setMfaEnabled(data.mfa_enabled);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleSetupMfa = async () => {
+    setError(null);
+    setMfaMessage(null);
+    try {
+      const response = await fetch('http://localhost:8000/api/mfa/setup/', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) {
+        let errorMessage = 'Error al iniciar configuración MFA';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.detail || errorMessage;
+        } catch {
+          // No se pudo parsear JSON, mantener mensaje genérico
+        }
+        throw new Error(errorMessage);
+      }
+      const data = await response.json();
+      setMfaSetupQR(data.qr_code);
+      setMfaSecret(data.secret);
+      setShowMfaSetup(true);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleVerifyMfa = async () => {
+    setError(null);
+    setMfaMessage(null);
+    try {
+      const response = await fetch('http://localhost:8000/api/mfa/verify/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ code: mfaCode }),
+      });
+      if (!response.ok) {
+        throw new Error('Código MFA inválido');
+      }
+      setMfaMessage('MFA activado correctamente');
+      setMfaEnabled(true);
+      setShowMfaSetup(false);
+      setMfaCode('');
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleDisableMfa = async () => {
+    setError(null);
+    setMfaMessage(null);
+    try {
+      // Para deshabilitar MFA, se puede hacer un PATCH al usuario para poner mfa_enabled en false y limpiar mfa_secret
+      const response = await fetch('http://localhost:8000/api/user/', {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ mfa_enabled: false, mfa_secret: null }),
+      });
+      if (!response.ok) {
+        throw new Error('Error al deshabilitar MFA');
+      }
+      setMfaMessage('MFA deshabilitado correctamente');
+      setMfaEnabled(false);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
 
   if (!token) {
     setIsAuthenticated(false);
@@ -240,34 +350,81 @@ function Dashboard({ setIsAuthenticated }) {
 
   return (
     <div>
-        <div className="p-6 max-w-4xl mx-auto bg-white rounded-lg shadow-md mt-10">
+      <div className="p-6 max-w-4xl mx-auto bg-white rounded-lg shadow-md mt-10">
         <h1 className="text-3xl font-bold text-gray-800 mb-4">Bienvenido al Dashboard</h1>
         <p className="text-gray-600 text-lg">
-            Contenido protegido solo para usuarios autenticados.
+          Contenido protegido solo para usuarios autenticados.
         </p>
+
+        <div className="mt-6">
+          <h2 className="text-xl font-semibold mb-2">Autenticación MFA</h2>
+          {mfaEnabled ? (
+            <div>
+              <p className="mb-2 text-green-600">MFA está habilitado en tu cuenta.</p>
+              <button
+                onClick={handleDisableMfa}
+                className="bg-red-600 text-white py-2 px-4 rounded hover:bg-red-700 transition-colors"
+              >
+                Deshabilitar MFA
+              </button>
+            </div>
+          ) : (
+            <div>
+              <button
+                onClick={handleSetupMfa}
+                className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition-colors"
+              >
+                Configurar MFA
+              </button>
+              {showMfaSetup && (
+                <div className="mt-4">
+                  <p>Escanea este código QR con tu app autenticadora:</p>
+                  <img src={`data:image/png;base64,${mfaSetupQR}`} alt="QR MFA" className="my-2" />
+                  <p>O usa este código secreto: <strong>{mfaSecret}</strong></p>
+                  <input
+                    type="text"
+                    placeholder="Ingresa el código MFA"
+                    value={mfaCode}
+                    onChange={(e) => setMfaCode(e.target.value)}
+                    className="border border-gray-300 rounded px-3 py-2 mt-2"
+                  />
+                  <button
+                    onClick={handleVerifyMfa}
+                    className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 mt-2"
+                  >
+                    Verificar y Activar MFA
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+          {mfaMessage && <p className="text-green-600 mt-2">{mfaMessage}</p>}
+          {error && <p className="text-red-600 mt-2">{error}</p>}
+        </div>
       </div>
+
       <div className="p-3 max-w-4xl mx-auto bg-white rounded-lg shadow-md mt-2">
-  <div className="flex justify-center gap-4 mt-4 flex-wrap">
-      <button
-        onClick={handleFetchCredentials}
-        className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition-colors"
-      >
-        Buscar
-      </button>
-      <button
-        onClick={toggleCreateForm}
-        className="bg-purple-600 text-white py-2 px-4 rounded hover:bg-purple-700 transition-colors"
-      >
-        Crear
-      </button>
-      <button
-        onClick={handleLogout}
-        className="bg-red-600 text-white py-2 px-4 rounded hover:bg-red-700 transition-colors"
-      >
-        Logout
-      </button>
-    </div>
-  </div>
+        <div className="flex justify-center gap-4 mt-4 flex-wrap">
+          <button
+            onClick={handleFetchCredentials}
+            className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition-colors"
+          >
+            Buscar
+          </button>
+          <button
+            onClick={toggleCreateForm}
+            className="bg-purple-600 text-white py-2 px-4 rounded hover:bg-purple-700 transition-colors"
+          >
+            Crear
+          </button>
+          <button
+            onClick={handleLogout}
+            className="bg-red-600 text-white py-2 px-4 rounded hover:bg-red-700 transition-colors"
+          >
+            Logout
+          </button>
+        </div>
+      </div>
 
       {error && <p className="text-red-600 mt-4">{error}</p>}
 
@@ -310,7 +467,7 @@ function Dashboard({ setIsAuthenticated }) {
           <div>
             <label htmlFor="password" className="block text-gray-700">Contraseña</label>
             <input
-              type="password"
+              type="text"
               id="password"
               name="password"
               value={newCredential.password}
