@@ -36,7 +36,6 @@ class SetupMFA(APIView):
 
         return Response({
             'qr_code': qr_base64,
-            'secret': user.mfa_secret  # Para debug (no exponer en producción)
         })
 
 class VerifyMFA(APIView):
