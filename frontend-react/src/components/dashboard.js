@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import DashboardHeader from './DashboardHeader';
+import MFASection from './MFASection';
+import CredentialForm from './CredentialForm';
+import CredentialList from './CredentialList';
 
 function Dashboard({ setIsAuthenticated }) {
+  const navigate = useNavigate();
   const [credentials, setCredentials] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -47,6 +53,10 @@ function Dashboard({ setIsAuthenticated }) {
           'Content-Type': 'application/json',
         },
       });
+      if (response.status === 401) {
+        handleTokenExpired();
+        return;
+      }
       if (!response.ok) {
         throw new Error('Error al obtener estado MFA');
       }
@@ -57,16 +67,25 @@ function Dashboard({ setIsAuthenticated }) {
     }
   };
 
+  const handleTokenExpired = () => {
+    localStorage.removeItem('authToken');
+    setIsAuthenticated(false);
+    navigate('/login');
+  };
+
   const handleSetupMfa = async () => {
     setError(null);
     setMfaMessage(null);
     try {
-      // Cambiado para obtener el código secreto también desde el backend
       const response = await fetch('http://localhost:8000/api/mfa/setup/', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
+      if (response.status === 401) {
+        handleTokenExpired();
+        return;
+      }
       if (!response.ok) {
         let errorMessage = 'Error al iniciar configuración MFA';
         try {
@@ -79,7 +98,6 @@ function Dashboard({ setIsAuthenticated }) {
       }
       const data = await response.json();
       setMfaSetupQR(data.qr_code);
-      // El backend no está enviando el secret, se puede eliminar o ajustar según backend
       setMfaSecret(data.secret || '');
       setShowMfaSetup(true);
     } catch (err) {
@@ -99,6 +117,10 @@ function Dashboard({ setIsAuthenticated }) {
         },
         body: JSON.stringify({ code: mfaCode }),
       });
+      if (response.status === 401) {
+        handleTokenExpired();
+        return;
+      }
       if (!response.ok) {
         throw new Error('Código MFA inválido');
       }
@@ -115,7 +137,6 @@ function Dashboard({ setIsAuthenticated }) {
     setError(null);
     setMfaMessage(null);
     try {
-      // Para deshabilitar MFA, se puede hacer un PATCH al usuario para poner mfa_enabled en false y limpiar mfa_secret
       const response = await fetch('http://localhost:8000/api/mfa/setup/', {
         method: 'DELETE',
         headers: {
@@ -124,6 +145,10 @@ function Dashboard({ setIsAuthenticated }) {
         },
         body: JSON.stringify({ mfa_enabled: false, mfa_secret: null }),
       });
+      if (response.status === 401) {
+        handleTokenExpired();
+        return;
+      }
       if (!response.ok) {
         throw new Error('Error al deshabilitar MFA');
       }
@@ -155,6 +180,11 @@ function Dashboard({ setIsAuthenticated }) {
           'Content-Type': 'application/json',
         },
       });
+
+      if (response.status === 401) {
+        handleTokenExpired();
+        return;
+      }
 
       if (!response.ok) {
         throw new Error('Error al obtener las credenciales');
@@ -191,6 +221,11 @@ function Dashboard({ setIsAuthenticated }) {
         },
       });
 
+      if (response.status === 401) {
+        handleTokenExpired();
+        return;
+      }
+
       if (!response.ok) {
         throw new Error('Error al desencriptar la contraseña');
       }
@@ -207,11 +242,15 @@ function Dashboard({ setIsAuthenticated }) {
   };
 
   const toggleCreateForm = () => {
-    setShowCreateForm(prev => !prev);
-    if (!showCreateForm) {
-      setCredentials([]);
-      setEditCredentialId(null);
-    }
+    setShowCreateForm(prev => {
+      const newState = !prev;
+      if (newState) {
+        setCredentials([]);
+        setEditCredentialId(null);
+        setError(null);
+      }
+      return newState;
+    });
   };
 
   const handleInputChange = (e) => {
@@ -301,6 +340,7 @@ function Dashboard({ setIsAuthenticated }) {
       email: '',
       password: '',
     });
+    setError(null);
   };
 
   const handleSaveEdit = async (id) => {
@@ -351,234 +391,50 @@ function Dashboard({ setIsAuthenticated }) {
   };
 
   return (
-    <div>
-      <div className="p-6 max-w-4xl mx-auto bg-white rounded-lg shadow-md mt-10">
-        <h1 className="text-3xl font-bold text-gray-800 mb-4">Bienvenido al Dashboard</h1>
-        <p className="text-gray-600 text-lg">
-          Contenido protegido solo para usuarios autenticados.
-        </p>
-
-        <div className="mt-6">
-          <h2 className="text-xl font-semibold mb-2">Autenticación MFA</h2>
-          {mfaEnabled ? (
-            <div>
-              <p className="mb-2 text-green-600">MFA está habilitado en tu cuenta.</p>
-              <button
-                onClick={handleDisableMfa}
-                className="bg-red-600 text-white py-2 px-4 rounded hover:bg-red-700 transition-colors"
-              >
-                Deshabilitar MFA
-              </button>
-            </div>
-          ) : (
-            <div>
-              <button
-                onClick={handleSetupMfa}
-                className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition-colors"
-              >
-                Configurar MFA
-              </button>
-              {showMfaSetup && (
-                <div className="mt-4">
-                  <p>Escanea este código QR con tu app autenticadora:</p>
-                  <img src={`data:image/png;base64,${mfaSetupQR}`} alt="QR MFA" className="my-2" />
-                  <p>O usa este código secreto: <strong>{mfaSecret}</strong></p>
-                  <input
-                    type="text"
-                    placeholder="Ingresa el código MFA"
-                    value={mfaCode}
-                    onChange={(e) => setMfaCode(e.target.value)}
-                    className="border border-gray-300 rounded px-3 py-2 mt-2"
-                  />
-                  <button
-                    onClick={handleVerifyMfa}
-                    className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 mt-2"
-                  >
-                    Verificar y Activar MFA
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-          {mfaMessage && <p className="text-green-600 mt-2">{mfaMessage}</p>}
-          {error && <p className="text-red-600 mt-2">{error}</p>}
-        </div>
-      </div>
-
-      <div className="p-3 max-w-4xl mx-auto bg-white rounded-lg shadow-md mt-2">
-        <div className="flex justify-center gap-4 mt-4 flex-wrap">
-          <button
-            onClick={handleFetchCredentials}
-            className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition-colors"
-          >
-            Buscar
-          </button>
-          <button
-            onClick={toggleCreateForm}
-            className="bg-purple-600 text-white py-2 px-4 rounded hover:bg-purple-700 transition-colors"
-          >
-            Crear
-          </button>
-          <button
-            onClick={handleLogout}
-            className="bg-red-600 text-white py-2 px-4 rounded hover:bg-red-700 transition-colors"
-          >
-            Logout
-          </button>
-        </div>
-      </div>
-
-      {error && <p className="text-red-600 mt-4">{error}</p>}
-
+    <div className="bg-gray-950 min-h-screen w-full py-8 px-4">
+      <DashboardHeader
+        onFetch={handleFetchCredentials}
+        onToggleCreate={toggleCreateForm}
+        onLogout={handleLogout}
+        loading={loading}
+        showCreateForm={showCreateForm}
+      />
+      <MFASection
+        mfaEnabled={mfaEnabled}
+        mfaSetupQR={mfaSetupQR}
+        mfaSecret={mfaSecret}
+        mfaCode={mfaCode}
+        showMfaSetup={showMfaSetup}
+        mfaMessage={mfaMessage}
+        error={error}
+        onSetupMfa={handleSetupMfa}
+        onVerifyMfa={handleVerifyMfa}
+        onDisableMfa={handleDisableMfa}
+        onMfaCodeChange={(e) => setMfaCode(e.target.value)}
+        onCancelMfaSetup={() => setShowMfaSetup(false)}
+      />
       {showCreateForm ? (
-        <form onSubmit={handleCreateCredential} className="mt-4 max-w-md space-y-4">
-          <div>
-            <label htmlFor="platform" className="block text-gray-700">Plataforma</label>
-            <input
-              type="text"
-              id="platform"
-              name="platform"
-              value={newCredential.platform}
-              onChange={handleInputChange}
-              required
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            />
-          </div>
-          <div>
-            <label htmlFor="username" className="block text-gray-700">Usuario</label>
-            <input
-              type="text"
-              id="username"
-              name="username"
-              value={newCredential.username}
-              onChange={handleInputChange}
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            />
-          </div>
-          <div>
-            <label htmlFor="email" className="block text-gray-700">Email</label>
-            <input
-              type="email"
-              id="email"
-              name="email"
-              value={newCredential.email}
-              onChange={handleInputChange}
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            />
-          </div>
-          <div>
-            <label htmlFor="password" className="block text-gray-700">Contraseña</label>
-            <input
-              type="text"
-              id="password"
-              name="password"
-              value={newCredential.password}
-              onChange={handleInputChange}
-              required
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            />
-          </div>
-          <button
-            type="submit"
-            className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700"
-          >
-            Guardar Credencial
-          </button>
-        </form>
+        <CredentialForm
+          isEditing={false}
+          formData={newCredential}
+          onInputChange={handleInputChange}
+          onSubmit={handleCreateCredential}
+        />
       ) : (
-        <>
-          {loading && <p className="mt-4">Cargando credenciales...</p>}
-          {credentials.length > 0 && (
-            <ul className="mt-4">
-              {credentials.map((cred) => (
-                <li key={cred.id} className="border p-2 mb-2 rounded">
-                  {editCredentialId === cred.id ? (
-                    <>
-                      <div>
-                        <label className="block text-gray-700">Plataforma</label>
-                        <input
-                          type="text"
-                          name="platform"
-                          value={editCredentialData.platform}
-                          onChange={handleEditInputChange}
-                          className="w-full border border-gray-300 rounded px-3 py-2"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-gray-700">Usuario</label>
-                        <input
-                          type="text"
-                          name="username"
-                          value={editCredentialData.username}
-                          onChange={handleEditInputChange}
-                          className="w-full border border-gray-300 rounded px-3 py-2"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-gray-700">Email</label>
-                        <input
-                          type="email"
-                          name="email"
-                          value={editCredentialData.email}
-                          onChange={handleEditInputChange}
-                          className="w-full border border-gray-300 rounded px-3 py-2"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-gray-700">Contraseña</label>
-                        <input
-                          type="text"
-                          name="password"
-                          value={editCredentialData.password}
-                          onChange={handleEditInputChange}
-                          className="w-full border border-gray-300 rounded px-3 py-2"
-                        />
-                      </div>
-                      <button
-                        onClick={() => handleSaveEdit(cred.id)}
-                        className="bg-green-600 text-white py-1 px-3 rounded hover:bg-green-700 mr-2"
-                      >
-                        Guardar
-                      </button>
-                      <button
-                        onClick={handleCancelEdit}
-                        className="bg-gray-600 text-white py-1 px-3 rounded hover:bg-gray-700"
-                      >
-                        Cancelar
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <strong>Platform/Url:</strong> {cred.platform} <br />
-                      <strong>User:</strong> {cred.username} <br />
-                      <strong>Email:</strong> {cred.email} <br />
-                      <strong>Password:</strong> {decryptedPasswords[cred.id] || '********'}
-                      <button
-                        onClick={() => handleViewPassword(cred.id)}
-                        className="ml-4 bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
-                      >
-                        {decryptedPasswords[cred.id] ? 'Ocultar Contraseña' : 'Ver Contraseña'}
-                      </button>
-                      <button
-                        onClick={() => handleEditClick(cred)}
-                        className="ml-4 bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => handleDelete(cred.id)}
-                        className="ml-4 bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
-                      >
-                        Eliminar
-                      </button>
-                    </>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </>
+        <CredentialList
+          credentials={credentials}
+          decryptedPasswords={decryptedPasswords}
+          editCredentialId={editCredentialId}
+          editCredentialData={editCredentialData}
+          onEditClick={handleEditClick}
+          onViewPassword={handleViewPassword}
+          onDelete={handleDelete}
+          onEditInputChange={handleEditInputChange}
+          onSaveEdit={handleSaveEdit}
+          onCancelEdit={handleCancelEdit}
+        />
       )}
+      {error && <p className="text-red-400 mt-6 text-center">{error}</p>}
     </div>
   );
 }

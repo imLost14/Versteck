@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 function Login({ setIsAuthenticated }) {
+  const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [mfaRequired, setMfaRequired] = useState(false);
@@ -35,6 +37,7 @@ function Login({ setIsAuthenticated }) {
         } else {
           localStorage.setItem('authToken', data.access);
           setIsAuthenticated(true);
+          navigate('/dashboard');
         }
       } catch (error) {
         setError(error.message);
@@ -58,6 +61,7 @@ function Login({ setIsAuthenticated }) {
         // MFA verificado, guardar token y autenticar
         localStorage.setItem('authToken', token);
         setIsAuthenticated(true);
+        navigate('/dashboard');
       } catch (error) {
         setError(error.message);
       }
