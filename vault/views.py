@@ -38,6 +38,12 @@ class SetupMFA(APIView):
             'qr_code': qr_base64,
         })
 
+    def delete(self, request):
+        user = request.user
+        user.mfa_enabled = False
+        user.save()
+        return Response({'status': 'MFA desactivado'})
+
 class VerifyMFA(APIView):
     permission_classes = [IsAuthenticated]
 

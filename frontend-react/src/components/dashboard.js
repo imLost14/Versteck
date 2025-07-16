@@ -61,6 +61,7 @@ function Dashboard({ setIsAuthenticated }) {
     setError(null);
     setMfaMessage(null);
     try {
+      // Cambiado para obtener el código secreto también desde el backend
       const response = await fetch('http://localhost:8000/api/mfa/setup/', {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -78,7 +79,8 @@ function Dashboard({ setIsAuthenticated }) {
       }
       const data = await response.json();
       setMfaSetupQR(data.qr_code);
-      setMfaSecret(data.secret);
+      // El backend no está enviando el secret, se puede eliminar o ajustar según backend
+      setMfaSecret(data.secret || '');
       setShowMfaSetup(true);
     } catch (err) {
       setError(err.message);
@@ -114,8 +116,8 @@ function Dashboard({ setIsAuthenticated }) {
     setMfaMessage(null);
     try {
       // Para deshabilitar MFA, se puede hacer un PATCH al usuario para poner mfa_enabled en false y limpiar mfa_secret
-      const response = await fetch('http://localhost:8000/api/user/', {
-        method: 'PATCH',
+      const response = await fetch('http://localhost:8000/api/mfa/setup/', {
+        method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
